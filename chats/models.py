@@ -13,7 +13,9 @@ from account.models import User
 #     room=models.ForeignKey(RoomInfo,on_delete=models.CASCADE)
 #     class Meta:
 #         db_table="room_members"
-            
+
+
+
 # class Messages(models.Model):
 #     sender=models.ForeignKey(User,on_delete=models.CASCADE)
 #     room=models.ForeignKey(RoomInfo,on_delete=models.CASCADE)
@@ -22,7 +24,8 @@ from account.models import User
 #     class Meta:
 #         db_table="messages"
 
-# from django.contrib.auth.models import User
+
+
 from django.db import models
 
 class Chat(models.Model):
@@ -53,7 +56,7 @@ class Message(models.Model):
 
 
 class GroupAdmin(models.Model):
-
+    
     chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name="group_admins")
     admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name="admin_groups")
     

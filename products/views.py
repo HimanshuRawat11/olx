@@ -10,7 +10,7 @@ from rest_framework import generics
 from .models import productStore,produtcCategory,productSubcategory,product_photos,ProductDetails,ProductTitles
 from .serializer import createCategorySerializer,createSubcategorySerializer,addImageSerializer,displayProductsSerializer,displayAdSerializer
 
-class addCategoryView(APIView):
+class AddCategoryView(APIView):
     
     authentication_classes=[JWTAuthentication]
     permission_classes=[IsAuthenticated,IsAdminUser]
@@ -28,7 +28,7 @@ class addCategoryView(APIView):
         return Response(serializer.errors)
     
 
-class addSubCategoryView(APIView):
+class AddSubCategoryView(APIView):
     
     authentication_classes=[JWTAuthentication]
     permission_classes=[IsAuthenticated,IsAdminUser]
