@@ -4,38 +4,41 @@ from rest_framework_simplejwt.tokens import AccessToken
 from account.models import User
 from .models import Message,Chat,GroupAdmin
 from django.db import transaction
+from .utilites import authenticate_user
+import json
+from asgiref.sync import sync_to_async
+
+
+async def chat_homepage(sid):
+    session_details=await sio.get_session(sid)
+    user=await User.objects.aget(id=session_details["id"])
+    chat_details=[]
+    async for chat in Chat.objects.filter(participants__id=user.id):
+            chat_items={}
+            chat_items["Chat_name"]=chat.name
+            chat_items["Is_group"]=chat.is_group
+            
+            chat_details.append(chat_items)
+    return chat_details
 
 
 
 @sio.event
 async def connect(sid, environ):
-    query_string = environ.get("QUERY_STRING", "")
-    params = dict(q.split("=") for q in query_string.split("&") if "=" in q)
-    token = params.get("token")
-    if not token:
-        print("No token provided")
+    user_authenticated=await authenticate_user(sid,environ)
+    
+    if not user_authenticated:
+        print("Invalid user")
         await sio.disconnect(sid)
-        return
+        return 
+    
+    print(f"User {user_authenticated.username} connected with socket ID {sid}")
+    await sio.save_session(sid, {'id':user_authenticated.id,'username': user_authenticated.username,'email':user_authenticated.email})
+    chat_room_data=await chat_homepage(sid)
+    chat_room_data=json.dumps(chat_room_data)
+    print(chat_room_data)
 
-    try:
-        decoded_token = AccessToken(token)
-        user = await User.objects.aget(id=decoded_token["user_id"]) 
-
-        if not user:
-            print("Invalid user")
-            await sio.disconnect(sid)
-            return
-
-        print(f"User {user.username} connected with socket ID {sid}")
-        await sio.emit("auth_success", {"message": f"Welcome {user.username}!"}, room=sid)
-
-    except User.DoesNotExist:
-        print("User not found")
-        await sio.disconnect(sid)
-
-    except Exception as e:
-        print(f"Authentication error: {e}")
-        await sio.disconnect(sid)
+    await sio.emit("auth_success", {"message": f"Welcome {user_authenticated.username}!","chat_room":chat_room_data},to=sid)
 
 
 @sio.event
@@ -44,22 +47,25 @@ async def create_room(sid,data):
             user=data["users"]
             is_group_or_not=data["is_group"]
             group_name=data["group_name"]
-            if group_name:
+            if is_group_or_not:
                 chat_room_created = await Chat.objects.acreate(name=group_name,is_group=is_group_or_not)
+                group_admin=await GroupAdmin.objects.acreate(chat=chat_room_created,admin=await User.objects.aget(id=user[0]))
             else:
                 user1_details=await User.objects.aget(id=user[0])
                 user2_details=await User.objects.aget(id=user[1])
                 room_name='-'.join([user1_details.username,user2_details.username])
                 chat_room_created = await Chat.objects.acreate(name=room_name,is_group=is_group_or_not)
-            
 
             for users in user:
                 user_instance = await User.objects.aget(id=users)  
                 await chat_room_created.participants.aadd(user_instance) 
 
         except Exception as innerException:
-            await chat_room_created.adelete()
             print("inner exception  occured")
+            if is_group_or_not:
+                await group_admin.adelete()
+
+            await chat_room_created.adelete()
             raise innerException
         
 
@@ -79,24 +85,24 @@ async def exit_room(sid,data):
     return "leaving room"
 
 
-async def store_message(sid, data):
+async def store_message(sid, data,session_detail):
     try:
-        room = data["room"]
-        message = data["message"]
-        sender = sid
-        await sync_to_async(Message.objects.create, thread_sensitive=True)(
-            room=room, message=message, sender=sender
-        )
+        room=await Chat.objects.aget(id=data["room_id"])
+        user= await User.objects.aget(id=session_detail["id"])
+
+        await Message.objects.acreate(chat=room,sender=user, text=data["message"])
     except Exception as e:
         print(e)
 
 
 @sio.event
 async def send_message(sid, data):
-    room = data["room"]
+    session_detail= await sio.get_session(sid)
     message = data["message"]
-    print(f"{message} sent by {sid} in room {room}")
-    await store_message(sid, data)
+    print(data)
+    room=await Chat.objects.aget(id=data["room_id"])
+    print(f"{message}  in room {room.name}")
+    await store_message(sid, data,session_detail)
 
     await sio.emit('get_message', {"message": message}, room=room)
 
