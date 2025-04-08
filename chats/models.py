@@ -1,32 +1,7 @@
 from django.db import models
 from account.models import User
-
-# Create your models here.
-
-# class RoomInfo(models.Model):
-#     room_name=models.CharField(max_length=255)
-#     class Meta:
-#         db_table="rooms"
-
-# class RoomMembers(models.Model):
-#     user=models.ForeignKey(User,on_delete=models.CASCADE)
-#     room=models.ForeignKey(RoomInfo,on_delete=models.CASCADE)
-#     class Meta:
-#         db_table="room_members"
-
-
-
-# class Messages(models.Model):
-#     sender=models.ForeignKey(User,on_delete=models.CASCADE)
-#     room=models.ForeignKey(RoomInfo,on_delete=models.CASCADE)
-#     message=models.TextField()
-#     created_at=models.DateTimeField(auto_now_add=True)
-#     class Meta:
-#         db_table="messages"
-
-
-
 from django.db import models
+
 
 class Chat(models.Model):
 
@@ -41,7 +16,7 @@ class Chat(models.Model):
 
 
 class Message(models.Model):
-    
+
     chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name="messages")
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
     text = models.TextField()

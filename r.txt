@@ -67,3 +67,18 @@
             #     ProductDetails.objects.create(product=product_created,title=att,value=val)
             # for val in photos:
             #     product_photos.objects.create(product=product_created,photos=val)
+
+
+Loop for iteratinig through the chats to display in the homepage
+
+
+    # async for chat in Chat.objects.filter(participants__id=user.id):
+    #     chat_items={}
+    #     chat_items["chat_id"]=chat.id
+    #     chat_items["chat_name"]=chat.name
+    #     chat_items["is_group"]=chat.is_group
+    #     chat_items["unread_message"] = await Message.objects.filter(
+    #     chat__id=chat.id,is_read=False,chat__participants__id=user.id
+    # ).values('chat_id').annotate(count=Count('text')).order_by('chat_id').exclude(sender=user).afirst()
+    #     chat_items["last_message"]=await Message.objects.filter(chat=chat).values('text','timestamp').order_by('timestamp').alast()
+    #     chat_details.append(chat_items)

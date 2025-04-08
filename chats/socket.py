@@ -7,19 +7,50 @@ from django.db import transaction
 from .utilites import authenticate_user
 import json
 from asgiref.sync import sync_to_async
+from django.db.models import Count
+# from channels 
+from datetime import datetime
 
-
-async def chat_homepage(sid):
+@sio.event
+async def chat_homepage(sid,data):
     session_details=await sio.get_session(sid)
     user=await User.objects.aget(id=session_details["id"])
     chat_details=[]
+    
     async for chat in Chat.objects.filter(participants__id=user.id):
-            chat_items={}
-            chat_items["Chat_name"]=chat.name
-            chat_items["Is_group"]=chat.is_group
-            
-            chat_details.append(chat_items)
-    return chat_details
+        chat_items = {
+            "chat_id": chat.id,
+            "chat_name": chat.name,
+            "is_group": chat.is_group,
+        }
+
+        unread = await Message.objects.filter(
+            chat__id=chat.id,
+            is_read=False,
+            chat__participants__id=user.id
+        ).exclude(sender=user).values('chat_id').annotate(count=Count('text')).order_by('chat_id').afirst()
+        chat_items["unread_message"] = unread.get("count", 0) if unread else 0
+        last_msg = await Message.objects.filter(chat=chat).values('id','text', 'timestamp').order_by('timestamp').alast()
+
+        if last_msg:
+            chat_items["last_message"] = {
+                "text": last_msg["text"],
+                "timestamp": last_msg["timestamp"].isoformat()  
+            }
+            chat_items["last_message_id"] = last_msg["id"]
+
+        else:
+            chat_items["last_message"] = None
+            chat_items["last_message_id"] = -1
+
+        chat_details.append(chat_items)
+
+    chat_details.sort(key=lambda x: x["last_message_id"], reverse=True)
+
+    for chat in chat_details:
+        chat.pop("last_message_id", None)
+                
+    await sio.emit("chat_homepage_display",{"data":chat_details},to=sid)
 
 
 
@@ -34,11 +65,8 @@ async def connect(sid, environ):
     
     print(f"User {user_authenticated.username} connected with socket ID {sid}")
     await sio.save_session(sid, {'id':user_authenticated.id,'username': user_authenticated.username,'email':user_authenticated.email})
-    chat_room_data=await chat_homepage(sid)
-    chat_room_data=json.dumps(chat_room_data)
-    print(chat_room_data)
 
-    await sio.emit("auth_success", {"message": f"Welcome {user_authenticated.username}!","chat_room":chat_room_data},to=sid)
+    await sio.emit("auth_success", {"message": f"Welcome {user_authenticated.username}!"},to=sid)
 
 
 @sio.event
@@ -69,13 +97,31 @@ async def create_room(sid,data):
             raise innerException
         
 
-
-
 @sio.event
 async def enter_room(sid,data):
-    room=data["room"]
-    await sio.enter_room(sid,room)
-    return "Joined room"
+    try:
+        session_detail= await sio.get_session(sid)
+        user=await User.objects.aget(id=session_detail["id"])
+        chat_room=await Chat.objects.aget(id=data["room_id"])
+        
+        await Message.objects.filter(chat__id=chat_room.id).values('chat_id').exclude(sender=user).aupdate(is_read=True)
+
+        messages=[]
+        async for message in  Message.objects.select_related('sender').filter(chat=chat_room).order_by('timestamp'):
+            current_message={}
+            current_message["message"]=message.text
+            current_message["sent_by"] = message.sender.id.hex
+            current_message["sent_on"]=message.timestamp.isoformat()
+            messages.append(current_message)
+        await sio.enter_room(sid,chat_room.name)
+        await sio.emit("room_message_display",{"data":messages},to=sid)
+        return "Joined room"
+    except Exception as e:
+        print(f"Error occured{e}")
+
+@sio.event
+async def delete_room(sid,data):
+    return
 
 
 @sio.event
