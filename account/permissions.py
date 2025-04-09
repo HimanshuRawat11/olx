@@ -14,5 +14,5 @@ class IsVerified(BasePermission):
                 return True
             raise PermissionDenied
         except User.DoesNotExist:
-            raise User.DoesNotExist
+            raise PermissionDenied("No User found with this email")
         
