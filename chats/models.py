@@ -14,6 +14,9 @@ class Chat(models.Model):
     async def adelete_room(self,user):
         await self.hidden_for.aadd(user)
         return True
+    def delete_room(self,user):
+        self.hidden_for.add(user)
+        return True
     class Meta:
         db_table="chats"
     def __str__(self):

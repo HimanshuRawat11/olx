@@ -82,3 +82,29 @@ Loop for iteratinig through the chats to display in the homepage
     # ).values('chat_id').annotate(count=Count('text')).order_by('chat_id').exclude(sender=user).afirst()
     #     chat_items["last_message"]=await Message.objects.filter(chat=chat).values('text','timestamp').order_by('timestamp').alast()
     #     chat_details.append(chat_items)
+
+
+
+Function for deleting the room 
+# @sio.event
+# async def delete_room(sid,data):
+#     try:
+#         session_detail=await sio.get_session(sid)
+#         room_to_be_deleted=await Chat.objects.aget(id=data["room_id"])
+#         is_deleted=None
+#         try:
+#             user=await User.objects.aget(id=session_detail["id"])
+#             # print(await Chat.objects.filter(id=room_to_be_deleted.id,participants__id=user.id).afirst())
+#             if await Chat.objects.filter(id=room_to_be_deleted.id,participants__id=user.id).afirst():
+#                 print("Inside")
+#                 is_deleted=await room_to_be_deleted.adelete_room(user)
+#             if is_deleted:
+#                 async for message in Message.objects.filter(chat__id=room_to_be_deleted.id):
+#                     await message.hidden_for.aadd(user)
+#                 await sio.emit("room_deleted",{"message":f"Room was deleted for {user.username}"},to=sid)
+#             else:
+#                 print("room was not deleted,The user is not a part of that room")
+#         except Exception as e:
+#             print(f"An error occured while deleting:{e.with_traceback}")
+#     except Exception as e:
+#         print(f"Error Occured insufficient data :{e.with_traceback}")
